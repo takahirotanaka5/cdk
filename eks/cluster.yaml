@@ -1,0 +1,68 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: my-cluster
+  region: ap-northeast-1
+  version: "1.33"
+
+vpc:
+  id: vpc-0deece3e6d4bd928e
+  cidr: 10.0.0.0/16
+  subnets:
+    private:
+      ap-northeast-1a:
+        id: subnet-05ecbb2af8ee3017d
+      ap-northeast-1c:
+        id: subnet-08af1163f3331643c
+  nat:
+    gateway: Disable
+  clusterEndpoints:
+    privateAccess: true
+    publicAccess: true
+  publicAccessCIDRs:
+    - 126.221.226.43/32
+
+iam:
+  serviceRoleARN: arn:aws:iam::475790822934:role/eks-cluster-role
+  fargatePodExecutionRoleARN: arn:aws:iam::475790822934:role/pod-execution-role
+  withOIDC: true
+
+# aws-authは非推奨なので、指定しない
+# iamIdentityMappings
+# 新方式：EKS Access
+accessConfig:
+  # 最初から API のみでOK（既存互換が必要なら API_AND_CONFIG_MAP にして段階移行）
+  authenticationMode: API
+
+  accessEntries:
+    # 開発者/運用者ロールにクラスタ管理権限（必要に応じて View/namespace限定に変更可）
+    - principalARN: arn:aws:iam::475790822934:role/account-admin-role
+      accessPolicies:
+        - policyARN: arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy
+          accessScope:
+            type: cluster
+
+addons:
+  - name: coredns
+    version: v1.12.1-eksbuild.2
+    configurationValues: "{\"replicaCount\":1}"
+    resolveConflicts: overwrite
+
+fargateProfiles:
+  - name: systems-profile
+    podExecutionRoleARN: arn:aws:iam::475790822934:role/pod-execution-role
+    selectors:
+    - namespace: default
+    - namespace: kube-system
+    subnets:
+    - subnet-05ecbb2af8ee3017d
+    - subnet-08af1163f3331643c
+
+  - name: services-profile
+    podExecutionRoleARN: arn:aws:iam::475790822934:role/pod-execution-role
+    selectors:
+    - namespace: alpha
+    subnets:
+    - subnet-05ecbb2af8ee3017d
+    - subnet-08af1163f3331643c
